@@ -1,0 +1,129 @@
+<simulation>
+
+  <archetypes>
+    <spec>
+      <lib>agents</lib>
+      <name>NullRegion</name>
+    </spec>
+    <spec>
+      <lib>agents</lib>
+      <name>NullInst</name>
+    </spec>
+    <spec>
+      <lib>cycamore</lib>
+      <name>Source</name>
+    </spec>
+    <spec>
+      <lib>cycamore</lib>
+      <name>Reactor</name>
+    </spec>
+    <spec>
+      <lib>cycamore</lib>
+      <name>Sink</name>
+    </spec>
+    <spec>
+      <lib>d3ploy.no_inst</lib>
+      <name>NOInst</name>
+    </spec>
+
+    <spec>
+      <lib>udb_reactor.udb_reactor</lib>
+      <name>udb_reactor</name>
+    </spec>
+
+  </archetypes>
+
+  <control>
+    <duration>15</duration>
+    <startmonth>1</startmonth>
+    <startyear>2000</startyear>
+  </control>
+
+  <facility>
+    <config>
+      <udb_reactor>
+        <outcommod>fuel</outcommod>
+        <reactor_id>1</reactor_id>
+      </udb_reactor>
+    </config>
+    <name>udb_reactor</name>
+  </facility>
+
+  <facility>
+    <name>sink</name>
+    <config>
+      <Sink>
+        <in_commods><val>fuel</val></in_commods>
+        <capacity>1e100</capacity>
+      </Sink>
+    </config>
+  </facility>
+
+
+  <facility>
+    <name>dirt</name>
+    <config>
+      <Sink>
+        <in_commods><val>dirt</val></in_commods>
+        <capacity>1e100</capacity>
+      </Sink>
+    </config>
+  </facility>
+
+<region>
+    <name>SingleRegion</name>
+    <config><NullRegion/></config>
+    <institution>
+      <name>SingleInstitution</name>
+      <initialfacilitylist>
+
+        <entry>
+          <prototype>udb_reactor</prototype>
+          <number>1</number>
+        </entry>
+
+        <entry>
+          <prototype>sink</prototype>
+          <number>1</number>
+        </entry>
+
+        <entry>
+          <prototype>dirt</prototype>
+          <number>1</number>
+        </entry>
+
+      </initialfacilitylist>
+      <config><NullInst/></config>
+    </institution>
+  </region>
+
+  <recipe>
+    <basis>mass</basis>
+    <name>fresh_uox</name>
+    <nuclide>
+      <comp>0.711</comp>
+      <id>U235</id>
+    </nuclide>
+    <nuclide>
+      <comp>99.289</comp>
+      <id>U238</id>
+    </nuclide>
+  </recipe>
+  <recipe>
+    <basis>mass</basis>
+    <name>spent_uox</name>
+    <nuclide>
+      <comp>50</comp>
+      <id>Kr85</id>
+    </nuclide>
+    <nuclide>
+      <comp>50</comp>
+      <id>Cs137</id>
+    </nuclide>
+  </recipe>
+
+
+</simulation>
+
+
+
