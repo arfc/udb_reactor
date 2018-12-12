@@ -4,8 +4,7 @@ import math
 from collections import defaultdict
 import numpy as np
 import scipy as sp
-import sqlite3 as lite
-
+import pandas as pd
 from cyclus.agents import Institution, Agent, Facility
 from cyclus import lib
 import cyclus.typesystem as ts
@@ -36,6 +35,16 @@ class udb_reactor(Facility):
         default=''
     )
 
+    startyear = ts.Int(
+        doc="Startyear of simulation",
+        tooltip="Simulation Startyear"
+    )
+
+    startmonth = ts.Int(
+        doc="Startmonth of simulation",
+        tooltip="Simulation Startmonth"
+    )
+
     inventory = ts.ResBufMaterialInv()
 
 
@@ -49,37 +58,29 @@ class udb_reactor(Facility):
 
     def enter_notify(self):
         super().enter_notify()
-        conn = lite.connect(self.db_path)
-        conn.row_factory = lite.Row
-        self.cur = conn.cursor()
-        self.assembly_discharge_dict = {}
-        make_keys = self.cur.execute('SELECT distinct(evaluation_date) FROM discharge '
-                                     'WHERE reactor_id = %i' %self.reactor_id).fetchall()
-        for row in make_keys:
-            self.assembly_discharge_dict[row['evaluation_date']] = {}
-        assembly_ids = self.cur.execute('SELECT evaluation_date, isotope, '
-                                        'sum(total_mass_g) FROM discharge '
-                                        'WHERE reactor_id = %i GROUP BY evaluation_date, isotope' %self.reactor_id).fetchall()
-        for assembly in assembly_ids:
-            # lump everything to evaluation date
-            self.assembly_discharge_dict[assembly['evaluation_date']][assembly['isotope']] = float(assembly['sum(total_mass_g)']) * 1e-3
-        # can't find a way to get it from framework
-        self.startyear = 1969
-        self.startmonth = 1
+        df = pd.read_table(self.db_path)
+        self.reactor_assems = df.loc[df['reactor_id'] == self.reactor_id]
+        self.reactor_assems['discharge_date'] = self.reactor_assems['discharge_date'].str[:7]
+        self.assembly_dates = self.reactor_assems['discharge_date'].unique()
+        # for memory
+        del df
 
     def tick(self):
         year_month = self.find_year_month()
-        for key, val in self.assembly_discharge_dict.items():
-            if key[:-3] == year_month:
-                total_mass = sum(val.values())
+        if year_month in self.assembly_dates:
+            assembly_id_list = self.reactor_assems.loc[self.reactor_assems['discharge_date'] == year_month]['assembly_id'].unique()
+            for assembly in assembly_id_list:
+                assem_data = self.reactor_assems.loc[self.reactor_assems['assembly_id'] == assembly][['name', 'total_mass_g']]
+                assem_data['comp'] = assem_data['total_mass_g'] / sum(assem_data['total_mass_g'])
+                composition = {}
+                for indx, row in assem_data.iterrows():
+                    composition[row['name']] = row['comp']
+                tot_mass = sum(assem_data['total_mass_g']) * 1e-3
                 if self.recipe_name != '':
                     composition = self.context.get_recipe(self.recipe_name)
-                else:
-                    composition = {}
-                    for iso, mass in val.items():
-                        composition[iso.capitalize()] = mass
-                material = ts.Material.create(self, total_mass, composition)
+                material = ts.Material.create(self, tot_mass, composition)
                 self.inventory.push(material)
+
 
     def get_material_bids(self, requests):
         """ Gets material bids that want its `outcommod' an

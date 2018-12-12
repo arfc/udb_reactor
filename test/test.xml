@@ -21,16 +21,19 @@
   </archetypes>
 
   <control>
-    <duration>15</duration>
+    <duration>300</duration>
     <startmonth>1</startmonth>
-    <startyear>2000</startyear>
+    <startyear>1969</startyear>
   </control>
 
   <facility>
     <config>
       <udb_reactor>
         <outcommod>fuel</outcommod>
-        <reactor_id>1</reactor_id>
+        <reactor_id>122</reactor_id>
+        <startyear>1969</startyear>
+        <startmonth>1</startmonth>
+        <db_path>~/github/udb_reactor/db/1yr.dat</db_path>
       </udb_reactor>
     </config>
     <name>udb_reactor</name>
