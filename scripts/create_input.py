@@ -1,24 +1,19 @@
 import sqlite3 as lite
 import os
+import pandas as pd
+import numpy as np
 
 """ This script generates two cyclus input files:
   one where the recipe is used, and the other using the udb database
 
   Separate xml files are created for simplicity, and XInclude is used."""
 
-db_path = '/home/teddy/github/udb_reactor/db/1yr.sqlite'
+db_path = '/home/teddy/github/udb_reactor/db/1yr.dat'
 output_path = 'input.xml'
 recipe_output_path = 'recipe_input.xml'
 
-conn = lite.connect(db_path)
-conn.row_factory = lite.Row
-cur = conn.cursor()
-
-reactor_ids = cur.execute('SELECT distinct(reactor_id) FROM discharge').fetchall()
-id_list = []
-for row in reactor_ids:
-  id_list.append(row['reactor_id'])
-
+df = pd.read_table(db_path)
+id_list = df['reactor_id'].unique()
 
 # start year is 1969-01
 xml_file = """
@@ -72,6 +67,8 @@ for reactor_id in id_list:
             <reactor_id>%i</reactor_id>
             <db_path>%s</db_path>
             <recipe_name>used_fuel_recipe</recipe_name>
+            <startyear>1969</startyear>
+            <startmonth>1</startmonth>
           </udb_reactor>
         </config>
         <name>%i</name>
@@ -135,13 +132,13 @@ xml_file += """
 """
 
 entry_file = "<root>"
-for reactor_id in reactor_ids:
+for reactor_id in id_list:
     entry_file += """
         <entry>
           <prototype>%i</prototype>
           <number>1</number>
         </entry>
-    """ %reactor_id['reactor_id']
+    """ %reactor_id
 entry_file += "</root>"
 with open('prototype.xml', 'w') as f:
     f.write(entry_file)
@@ -191,19 +188,20 @@ with open(output_path, 'w') as f:
     f.write(xml_file_without_recipe)
 
 
-# generate recipe block
-# by taking the average and finding the assembly closest
-# to the average burnup and enrichment to the average
-avg_burnup = cur.execute('SELECT avg(discharge_burnup) FROM discharge').fetchone()[0]
-avg_enrichment = cur.execute('SELECT avg(initial_enrichment) FROM discharge').fetchone()[0]
-min_diff = cur.execute('SELECT assembly_id, min(abs(discharge_burnup - %f) + abs(initial_enrichment - %f)) '
-                       'FROM discharge' %(avg_burnup, avg_enrichment)).fetchone()[0]
-chosen_assem = cur.execute('SELECT * FROM discharge WHERE assembly_id = %i' %min_diff).fetchall()
-total_mass = chosen_assem[0]['initial_uranium_kg']
+mean_burnup = np.mean(df['discharge_burnup'].unique())
+mean_enrichment = np.mean(df['initial_enrichment'].unique())
+df['bu_diff'] = np.abs(df['discharge_burnup'] - mean_burnup)
+df['er_diff'] = np.abs(df['initial_enrichment'] - mean_enrichment)
+df['tot_diff'] = np.abs(df['bu_diff'] + df['er_diff'])
+indx = df['tot_diff'].argmin()
+assem_id = df.loc[indx, 'assembly_id']
+comp = df.loc[df['assembly_id'] == assem_id][['name', 'total_mass_g']]
+tot_mass = sum(comp['total_mass_g'])
 with open('avg_recipe.xml', 'w') as f:
     head = "<root>\n<recipe>\n\t<name>used_fuel_recipe</name>\n\t<basis>mass</basis>\n"
-    for row in chosen_assem:
-        head += '\t\t<nuclide> <id>%s</id> <comp>%f</comp> </nuclide>\n' %(row['isotope'].capitalize(), float(row['total_mass_g']) * 0.1 / total_mass)
+    for indx, row in comp.iterrows():
+        head += '\t\t<nuclide> <id>%s</id> <comp>%f</comp> </nuclide>\n' % (
+                    row['name'].capitalize(), float(row['total_mass_g'])  / tot_mass)
     head += '</recipe></root>'
     f.write(head)
 
